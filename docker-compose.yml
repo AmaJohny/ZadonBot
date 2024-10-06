@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  client-backend:
+    image: client:0.0.1
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PASTA_FILES_PATH: /mnt/dev/pastas
+      PASTA_LIST_FILENAME: /mnt/dev/pastas/pastasWithRegex.yml
+      PIC_FILES_PATH: /mnt/dev/shitpic
+      PIC_LIST_FILENAME: /mnt/dev/shitpic/picsWithPrompts.yml
+      BOT_NAME: <bot name>
+      BOT_TOKEN: <bot token>
+    volumes:
+      - ./dev:/mnt/dev
