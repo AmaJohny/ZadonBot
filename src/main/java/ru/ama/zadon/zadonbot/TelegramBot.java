@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class TelegramBot extends TelegramLongPollingBot {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( TelegramBot.class );
+    private static final String NON_LETTER_CHAR = "[ !@#$%^&*()_+\\-=`'\"\\\\|/?~0-9.,<>\\[\\]{};:№]";
 
     private final BotProperties botProperties;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool( 1 );
@@ -102,7 +103,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private boolean textContainsKeywords( String messageText, Set<String> keywords ) {
-        for ( String word : messageText.toLowerCase().split( "\\\\W+" ) ) {
+        for ( String word : messageText.toLowerCase().split( NON_LETTER_CHAR ) ) {
             if ( keywords.contains( word ) )
                 return true;
         }
