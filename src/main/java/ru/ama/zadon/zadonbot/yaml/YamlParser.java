@@ -1,7 +1,6 @@
 package ru.ama.zadon.zadonbot.yaml;
 
-import ru.ama.zadon.zadonbot.yaml.pasta.Pastas;
-import ru.ama.zadon.zadonbot.yaml.pic.Pics;
+import ru.ama.zadon.zadonbot.yaml.content.ContentConfigYaml;
 
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -14,12 +13,8 @@ import java.util.List;
 
 public class YamlParser {
 
-    public static Pastas parsePastas( String listFilename ) {
-        return readYaml( listFilename, Pastas.class ).getFirst();
-    }
-
-    public static Pics parsePics( String listFilename ) {
-        return readYaml( listFilename, Pics.class ).getFirst();
+    public static ContentConfigYaml parseConfig( String filename ) {
+        return readYaml( filename, ContentConfigYaml.class ).getFirst();
     }
 
     private static <T> List<T> readYaml( String fileName, Class<T> contentClass ) {

@@ -1,18 +1,19 @@
 package ru.ama.zadon.zadonbot.content.pasta;
 
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class PastaEntry {
 
     private final String name;
-    private final String regex;
+    private final Set<String> keywords;
     private final String filename;
     private final long timeout;
     private final AtomicLong lastUseTime = new AtomicLong(0);
 
-    public PastaEntry( String name, String regex, String filename, long timeout ) {
+    public PastaEntry( String name, Set<String> keywords, String filename, long timeout ) {
         this.name = name;
-        this.regex = regex;
+        this.keywords = keywords;
         this.filename = filename;
         this.timeout = timeout;
     }
@@ -21,8 +22,8 @@ public class PastaEntry {
         return name;
     }
 
-    public String getRegex() {
-        return regex;
+    public Set<String> getKeywords() {
+        return keywords;
     }
 
     public String getFilename() {

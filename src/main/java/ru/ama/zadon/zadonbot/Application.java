@@ -1,14 +1,13 @@
 package ru.ama.zadon.zadonbot;
 
-import ru.ama.zadon.zadonbot.content.pasta.PastaProperties;
-import ru.ama.zadon.zadonbot.content.pic.PicProperties;
+import ru.ama.zadon.zadonbot.git.GitProperties;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 @SpringBootApplication
-@EnableConfigurationProperties( {BotProperties.class, PastaProperties.class, PicProperties.class} )
+@EnableConfigurationProperties( {BotProperties.class, GitProperties.class} )
 public class Application {
 
     public static void main( String[] args ) {
