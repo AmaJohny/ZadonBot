@@ -1,6 +1,6 @@
 version: '3.8'
 services:
-  client-backend:
+  backend:
     image: zadon-bot:latest
     build:
       context: .
@@ -10,10 +10,8 @@ services:
       PASTA_LIST_FILENAME: /mnt/config/repo/pastas/pastasWithRegex.yml
       PIC_FILES_PATH: /mnt/config/repo/shitpic
       PIC_LIST_FILENAME: /mnt/config/repo/shitpic/picsWithPrompts.yml
-      BOT_NAME: <bot_name>
-      BOT_TOKEN: <bot_token>
-      REPO_URL: <repo_url>
-      REPO_TOKEN: <repo_token>
+    env_file:
+      - environment.env
     volumes:
       - config:/mnt/config
 volumes:
