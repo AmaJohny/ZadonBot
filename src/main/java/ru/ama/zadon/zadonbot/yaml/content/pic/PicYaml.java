@@ -1,6 +1,6 @@
-package ru.ama.zadon.zadonbot.yaml.pic;
+package ru.ama.zadon.zadonbot.yaml.content.pic;
 
-public class Pic {
+public class PicYaml {
 
     private String name;
     private String prompt;

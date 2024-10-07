@@ -3,8 +3,9 @@ WORKDIR /app
 COPY . /app/.
 RUN mvn -f /app/pom.xml clean package -Dmaven.test.skip=true
 
-FROM eclipse-temurin:21-jdk
+FROM eclipse-temurin:21-alpine
 WORKDIR /app
 COPY --from=builder /app/target/*.jar /app/*.jar
-#EXPOSE 8181
+RUN apk add --no-cache git
+RUN apk add --no-cache bash
 ENTRYPOINT ["java", "-jar", "-Dspring.profiles.active=PROM", "/app/*.jar" ]

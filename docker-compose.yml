@@ -1,16 +1,20 @@
 version: '3.8'
 services:
   client-backend:
-    image: client:0.0.1
+    image: zadon-bot:latest
     build:
       context: .
       dockerfile: Dockerfile
     environment:
-      PASTA_FILES_PATH: /mnt/dev/pastas
-      PASTA_LIST_FILENAME: /mnt/dev/pastas/pastasWithRegex.yml
-      PIC_FILES_PATH: /mnt/dev/shitpic
-      PIC_LIST_FILENAME: /mnt/dev/shitpic/picsWithPrompts.yml
-      BOT_NAME: <bot name>
-      BOT_TOKEN: <bot token>
+      PASTA_FILES_PATH: /mnt/config/repo/pastas
+      PASTA_LIST_FILENAME: /mnt/config/repo/pastas/pastasWithRegex.yml
+      PIC_FILES_PATH: /mnt/config/repo/shitpic
+      PIC_LIST_FILENAME: /mnt/config/repo/shitpic/picsWithPrompts.yml
+      BOT_NAME: <bot_name>
+      BOT_TOKEN: <bot_token>
+      REPO_URL: <repo_url>
+      REPO_TOKEN: <repo_token>
     volumes:
-      - ./dev:/mnt/dev
+      - config:/mnt/config
+volumes:
+  config:

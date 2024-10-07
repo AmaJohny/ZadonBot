@@ -9,6 +9,7 @@ public class PicEntry {
     private final String message;
     private final String filename;
     private final long timeout;
+    private volatile String fileId;
     private final AtomicLong lastUseTime = new AtomicLong(0);
 
     public PicEntry( String name, String prompt, String message, String filename, long timeout ) {
@@ -37,6 +38,14 @@ public class PicEntry {
 
     public long getTimeout() {
         return timeout;
+    }
+
+    public String getFileId() {
+        return fileId;
+    }
+
+    public void setFileId( String fileId ) {
+        this.fileId = fileId;
     }
 
     public AtomicLong getLastUseTime() {

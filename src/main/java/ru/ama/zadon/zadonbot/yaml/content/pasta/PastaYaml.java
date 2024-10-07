@@ -1,9 +1,11 @@
-package ru.ama.zadon.zadonbot.yaml.pasta;
+package ru.ama.zadon.zadonbot.yaml.content.pasta;
 
-public class Pasta {
+import java.util.Set;
+
+public class PastaYaml {
 
     private String name;
-    private String regex;
+    private Set<String> keywords;
     private String filename;
     private String timeout;
 
@@ -15,12 +17,12 @@ public class Pasta {
         this.name = name;
     }
 
-    public String getRegex() {
-        return regex;
+    public Set<String> getKeywords() {
+        return keywords;
     }
 
-    public void setRegex( String regex ) {
-        this.regex = regex;
+    public void setKeywords( Set<String> keywords ) {
+        this.keywords = keywords;
     }
 
     public String getFilename() {
