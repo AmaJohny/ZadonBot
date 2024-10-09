@@ -1,7 +1,5 @@
 package ru.ama.zadon.zadonbot;
 
-import ru.ama.zadon.zadonbot.git.GitProperties;
-
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -10,7 +8,7 @@ import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
 @SpringBootApplication
-@EnableConfigurationProperties( {BotProperties.class, GitProperties.class} )
+@EnableConfigurationProperties( {BotProperties.class} )
 public class Application {
 
     public static void main( String[] args ) {
@@ -19,6 +17,6 @@ public class Application {
 
     @Bean
     public TelegramClient telegramClient( BotProperties botProperties ) {
-        return new OkHttpTelegramClient( botProperties.getToken());
+        return new OkHttpTelegramClient( botProperties.getToken() );
     }
 }

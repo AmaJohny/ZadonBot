@@ -8,6 +8,7 @@ public class GitProperties {
     private String repoDir;
     private String repoUrl;
     private String token;
+    private String configUpdatePeriod;
 
     public String getRepoDir() {
         return repoDir;
@@ -31,5 +32,13 @@ public class GitProperties {
 
     public void setToken( String token ) {
         this.token = token;
+    }
+
+    public String getConfigUpdatePeriod() {
+        return configUpdatePeriod;
+    }
+
+    public void setConfigUpdatePeriod( String configUpdatePeriod ) {
+        this.configUpdatePeriod = configUpdatePeriod;
     }
 }
