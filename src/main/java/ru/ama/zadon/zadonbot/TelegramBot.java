@@ -10,14 +10,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.longpolling.BotSession;
+import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsumer;
+import org.telegram.telegrambots.longpolling.starter.AfterBotRegistration;
+import org.telegram.telegrambots.longpolling.starter.SpringLongPollingBot;
+import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
-import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import org.telegram.telegrambots.meta.generics.TelegramClient;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -31,19 +36,21 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Component
-public class TelegramBot extends TelegramLongPollingBot {
+public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThreadUpdateConsumer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( TelegramBot.class );
     private static final String NON_LETTER_CHAR = "[ !@#$%^&*()_+\\-=`'\"\\\\|/?~0-9.,<>\\[\\]{};:№]";
 
     private final BotProperties botProperties;
+    private final TelegramClient telegramClient;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool( 1 );
     private volatile ContentConfig contentConfig;
 
     @Autowired
-    public TelegramBot( BotProperties botProperties, GitProperties gitProperties ) {
-        super( botProperties.getToken() );
+    public TelegramBot( BotProperties botProperties, GitProperties gitProperties,
+                        TelegramClient telegramClient ) {
         this.botProperties = botProperties;
+        this.telegramClient = telegramClient;
         UpdateContentTask updateContentTask = new UpdateContentTask( gitProperties, botProperties.getConfigFile(),
                                                                      ( config ) -> contentConfig = config );
         updateContentTask.run();
@@ -56,12 +63,17 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     @Override
-    public String getBotUsername() {
-        return botProperties.getUsername();
+    public String getBotToken() {
+        return botProperties.getToken();
     }
 
     @Override
-    public void onUpdateReceived( Update update ) {
+    public LongPollingUpdateConsumer getUpdatesConsumer() {
+        return this;
+    }
+
+    @Override
+    public void consume( Update update ) {
         if ( update.hasMessage() && update.getMessage().hasText() ) {
             Message message = update.getMessage();
             String messageText = message.getText();
@@ -117,7 +129,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                                              .replyToMessageId( messageIdToReply )
                                              .build();
 
-        execute( sendMessage );
+        telegramClient.execute( sendMessage );
     }
 
     private boolean replyWithPic( String messageText, long chatId, Integer messageId ) {
@@ -154,7 +166,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                                        .replyToMessageId( messageIdToReply )
                                        .build();
 
-        Message executed = execute( sendPhoto );
+        Message executed = telegramClient.execute( sendPhoto );
         if ( fileId == null ) {
             fileId = getMaxSizeFileId( executed.getPhoto() );
             pic.setFileId( fileId );
@@ -173,5 +185,10 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
         }
         return fileId;
+    }
+
+    @AfterBotRegistration
+    public void afterRegistration( BotSession botSession ) {
+        LOGGER.info("Registered bot running state is: {}", botSession.isRunning());
     }
 }
