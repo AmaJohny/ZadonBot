@@ -56,16 +56,17 @@ public class UpdateContentTask implements Runnable {
         LOGGER.debug( "Updating content config" );
         ContentConfigYaml contentConfigYaml = YamlParser.parseConfig( configFilename );
         Map<String, ContentEntry> promptedContentEntries = new HashMap<>();
-        List<ContentEntry> allContentEntries = new ArrayList<>();
+        List<ContentEntry> keywordsContentEntries = new ArrayList<>();
         for ( ContentEntryYaml contentEntryYaml : contentConfigYaml.getContent().getList() ) {
             ContentEntry contentEntry = getContentEntry( contentEntryYaml );
             if ( contentEntry != null ) {
-                allContentEntries.add( contentEntry );
+                if ( contentEntry.getKeywords() != null )
+                    keywordsContentEntries.add( contentEntry );
                 if (contentEntry.getPrompt() != null)
                     promptedContentEntries.put( contentEntry.getPrompt(), contentEntry );
             }
         }
-        return new ContentConfig( promptedContentEntries, allContentEntries );
+        return new ContentConfig( promptedContentEntries, keywordsContentEntries );
     }
 
     @Nullable

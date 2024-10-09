@@ -14,8 +14,7 @@ import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsume
 import org.telegram.telegrambots.longpolling.starter.AfterBotRegistration;
 import org.telegram.telegrambots.longpolling.starter.SpringLongPollingBot;
 import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.send.*;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -35,6 +34,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
 
     private static final Logger LOGGER = LoggerFactory.getLogger( TelegramBot.class );
     private static final String NON_LETTER_CHAR = "[ !@#$%^&*()_+\\-=`'\"\\\\|/?~0-9.,<>\\[\\]{};:№]";
+    public static final String CACHED_FILE_ID_FOR_FILE_MESSAGE = "Cached fileId {} for file {}";
 
     private final BotProperties botProperties;
     private final ContentConfigProvider contentConfigProvider;
@@ -75,7 +75,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
             if ( promptedEntry != null && !promptedEntry.onTimeout() )
                 sendContent( message, promptedEntry );
             else {
-                for ( ContentEntry contentEntry : contentConfig.allContents() ) {
+                for ( ContentEntry contentEntry : contentConfig.keywordsContents() ) {
                     if ( !contentEntry.onTimeout() &&
                          textContainsKeywords( messageText, contentEntry.getKeywords() ) ) {
                         sendContent( message, contentEntry );
@@ -93,6 +93,15 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
                 break;
             case IMAGE:
                 sendImage( message, contentEntry );
+                break;
+            case GIF:
+                sendGif( message, contentEntry );
+                break;
+            case AUDIO:
+                sendAudio( message, contentEntry );
+                break;
+            case VOICE:
+                sendVoice( message, contentEntry );
                 break;
             default:
                 LOGGER.error( "Not implemented content type: {}", contentEntry.getType() );
@@ -139,7 +148,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
             if ( fileId == null ) {
                 fileId = getMaxSizeFileId( executed.getPhoto() );
                 contentEntry.setFileId( fileId );
-                LOGGER.debug( "Cached fileId {} for file {}", fileId, filepath );
+                LOGGER.debug( CACHED_FILE_ID_FOR_FILE_MESSAGE, fileId, filepath );
             }
         } catch ( TelegramApiException e ) {
             LOGGER.error( "Error while sending image to chat", e );
@@ -162,6 +171,77 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
                      .max( Comparator.comparing( PhotoSize::getFileSize ) )
                      .map( PhotoSize::getFileId )
                      .orElse( null );// will never be used
+    }
+
+    private void sendGif( Message message, ContentEntry contentEntry ) {
+        String fileId = contentEntry.getFileId();
+        Path filepath = contentEntry.getFilepath();
+        InputFile inputFile = getInputFile( fileId, filepath );
+
+        SendAnimation sendGif = SendAnimation.builder()
+                                               .chatId( String.valueOf( message.getChatId() ) )
+                                               .caption( contentEntry.getMessage() )
+                                               .animation( inputFile )
+                                               .replyToMessageId( message.getMessageId() )
+                                               .build();
+        try {
+            Message executed = telegramClient.execute( sendGif );
+            if ( fileId == null ) {
+                fileId = executed.getAnimation().getFileId();
+                contentEntry.setFileId( fileId );
+                LOGGER.debug( CACHED_FILE_ID_FOR_FILE_MESSAGE, fileId, filepath );
+            }
+        } catch ( TelegramApiException e ) {
+            LOGGER.error( "Error while sending image to chat", e );
+        }
+    }
+
+    private void sendAudio( Message message, ContentEntry contentEntry ) {
+        String fileId = contentEntry.getFileId();
+        Path filepath = contentEntry.getFilepath();
+        InputFile inputFile = getInputFile( fileId, filepath );
+
+        SendAudio sendAudio = SendAudio.builder()
+                                       .chatId( String.valueOf( message.getChatId() ) )
+                                       .caption( contentEntry.getMessage() )
+                                       .audio( inputFile )
+                                       .replyToMessageId( message.getMessageId() )
+                                       .build();
+
+        try {
+            Message executed = telegramClient.execute( sendAudio );
+            if ( fileId == null ) {
+                fileId = executed.getAudio().getFileId();
+                contentEntry.setFileId( fileId );
+                LOGGER.debug( CACHED_FILE_ID_FOR_FILE_MESSAGE, fileId, filepath );
+            }
+        } catch ( TelegramApiException e ) {
+            LOGGER.error( "Error while sending image to chat", e );
+        }
+    }
+
+    private void sendVoice( Message message, ContentEntry contentEntry ) {
+        String fileId = contentEntry.getFileId();
+        Path filepath = contentEntry.getFilepath();
+        InputFile inputFile = getInputFile( fileId, filepath );
+
+        SendVoice sendAudio = SendVoice.builder()
+                                       .chatId( String.valueOf( message.getChatId() ) )
+                                       .caption( contentEntry.getMessage() )
+                                       .voice( inputFile )
+                                       .replyToMessageId( message.getMessageId() )
+                                       .build();
+
+        try {
+            Message executed = telegramClient.execute( sendAudio );
+            if ( fileId == null ) {
+                fileId = executed.getVoice().getFileId();
+                contentEntry.setFileId( fileId );
+                LOGGER.debug( CACHED_FILE_ID_FOR_FILE_MESSAGE, fileId, filepath );
+            }
+        } catch ( TelegramApiException e ) {
+            LOGGER.error( "Error while sending image to chat", e );
+        }
     }
 
     private boolean textContainsKeywords( String messageText, Set<String> keywords ) {
