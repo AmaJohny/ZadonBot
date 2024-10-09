@@ -3,6 +3,7 @@ package ru.ama.zadon.zadonbot.content.pasta;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
+@Deprecated
 public class PastaEntry {
 
     private final String name;

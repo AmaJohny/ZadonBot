@@ -5,6 +5,8 @@ import java.time.Duration;
 public class Utils {
 
     public static long toMilliseconds( String strDuration ) {
+        if ( strDuration == null )
+            return -1;
         strDuration = strDuration.replaceAll( "\\s+", "" ).replaceFirst( "(\\d+d)", "P$1T" );
         if ( strDuration.charAt( 0 ) != 'P' ) {
             strDuration = "PT" + strDuration;

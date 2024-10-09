@@ -2,6 +2,7 @@ package ru.ama.zadon.zadonbot.content.pic;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+@Deprecated
 public class PicEntry {
 
     private final String name;

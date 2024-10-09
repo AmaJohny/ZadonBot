@@ -8,7 +8,6 @@ public class BotProperties {
     private String username;
     private String token;
     private String configFile;
-    private String configUpdatePeriod;
 
     public String getUsername() {
         return username;
@@ -32,13 +31,5 @@ public class BotProperties {
 
     public void setConfigFile( String configFile ) {
         this.configFile = configFile;
-    }
-
-    public String getConfigUpdatePeriod() {
-        return configUpdatePeriod;
-    }
-
-    public void setConfigUpdatePeriod( String configUpdatePeriod ) {
-        this.configUpdatePeriod = configUpdatePeriod;
     }
 }
