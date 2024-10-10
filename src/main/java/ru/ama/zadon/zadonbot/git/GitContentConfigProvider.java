@@ -90,7 +90,7 @@ public class GitContentConfigProvider implements ContentConfigProvider {
             } else {
                 LOGGER.debug( "Repo is up to date" );
             }
-            return upToDate;
+            return !upToDate;
         }
     }
 }
