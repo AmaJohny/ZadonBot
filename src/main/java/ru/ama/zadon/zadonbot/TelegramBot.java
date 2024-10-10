@@ -24,7 +24,6 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
@@ -152,10 +151,11 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
     private void sendText( Message message, ContentEntry contentEntry ) {
         try {
             String textToSend;
-            if ( contentEntry.getFilepath() == null ) {
+            Path filepath = contentEntry.getFilepath();
+            if ( filepath == null ) {
                 textToSend = contentEntry.getMessage();
             } else {
-                textToSend = Files.readString( contentEntry.getFilepath() );
+                textToSend = Utils.getFileContent( filepath );
             }
             sendText( message.getChatId(), message.getMessageId(), textToSend );
         } catch ( IOException | TelegramApiException e ) {
@@ -187,7 +187,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
             Message executed = telegramClient.execute( sendPhoto );
             if ( fileId == null ) {
                 fileId = getMaxSizeFileId( executed.getPhoto() );
-                contentEntry.setFileId( fileId );
+                contentEntry.saveFileId( fileId );
                 LOGGER.debug( CACHED_FILE_ID_FOR_FILE_MESSAGE, fileId, filepath );
             }
         } catch ( TelegramApiException e ) {
@@ -228,7 +228,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
             Message executed = telegramClient.execute( sendGif );
             if ( fileId == null ) {
                 fileId = executed.getAnimation().getFileId();
-                contentEntry.setFileId( fileId );
+                contentEntry.saveFileId( fileId );
                 LOGGER.debug( CACHED_FILE_ID_FOR_FILE_MESSAGE, fileId, filepath );
             }
         } catch ( TelegramApiException e ) {
@@ -252,7 +252,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
             Message executed = telegramClient.execute( sendAudio );
             if ( fileId == null ) {
                 fileId = executed.getAudio().getFileId();
-                contentEntry.setFileId( fileId );
+                contentEntry.saveFileId( fileId );
                 LOGGER.debug( CACHED_FILE_ID_FOR_FILE_MESSAGE, fileId, filepath );
             }
         } catch ( TelegramApiException e ) {
@@ -276,7 +276,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
             Message executed = telegramClient.execute( sendAudio );
             if ( fileId == null ) {
                 fileId = executed.getVoice().getFileId();
-                contentEntry.setFileId( fileId );
+                contentEntry.saveFileId( fileId );
                 LOGGER.debug( CACHED_FILE_ID_FOR_FILE_MESSAGE, fileId, filepath );
             }
         } catch ( TelegramApiException e ) {

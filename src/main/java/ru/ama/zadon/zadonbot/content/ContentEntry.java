@@ -1,8 +1,11 @@
 package ru.ama.zadon.zadonbot.content;
 
+import ru.ama.zadon.zadonbot.Utils;
+
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -23,7 +26,7 @@ public class ContentEntry {
 
     public ContentEntry( @Nonnull String name, @Nonnull ContentType type,
                          @Nullable String prompt, @Nullable Set<String> keywords,
-                         @Nullable String message, @Nullable Path filepath,
+                         @Nullable String message, @Nullable Path filepath, @Nullable String fileId,
                          long timeout ) {
         this.name = name;
         this.type = type;
@@ -31,6 +34,7 @@ public class ContentEntry {
         this.keywords = keywords;
         this.message = message;
         this.filepath = filepath;
+        this.fileId = fileId;
         this.timeout = timeout;
     }
 
@@ -80,7 +84,13 @@ public class ContentEntry {
         return fileId;
     }
 
-    public void setFileId( String fileId ) {
-        this.fileId = fileId;
+    public void saveFileId( String fileId ) {
+        assert filepath != null;
+            try {
+                Utils.setFileContent( Utils.getFileIdFilepath( filepath ), fileId );
+                this.fileId = fileId;
+            } catch ( IOException e ) {
+                throw new RuntimeException( e );
+            }
     }
 }

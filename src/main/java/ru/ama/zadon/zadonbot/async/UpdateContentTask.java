@@ -12,6 +12,8 @@ import jakarta.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -46,13 +48,18 @@ public class UpdateContentTask implements Runnable {
     @Override
     public void run() {
         if ( configFilesUpdater.get() || !isInitialized ) {
-            updatedConfigConsumer.accept( updateConfig() );
+            try {
+                updatedConfigConsumer.accept( updateConfig() );
+            } catch ( Exception e ) {
+                LOGGER.error( "Error updating content config", e );
+                throw new RuntimeException( e );
+            }
             isInitialized = true;
             LOGGER.debug( "Content config updated" );
         }
     }
 
-    private ContentConfig updateConfig() {
+    private ContentConfig updateConfig() throws IOException {
         LOGGER.debug( "Updating content config" );
         ContentConfigYaml contentConfigYaml = YamlParser.parseConfig( configFilename );
         Map<String, ContentEntry> promptedContentEntries = new HashMap<>();
@@ -70,15 +77,18 @@ public class UpdateContentTask implements Runnable {
     }
 
     @Nullable
-    private ContentEntry getContentEntry( ContentEntryYaml contentEntryYaml ) {
+    private ContentEntry getContentEntry( ContentEntryYaml contentEntryYaml ) throws IOException {
         if ( contentEntryYaml.getPrompt() == null && contentEntryYaml.getKeywords() == null ) {
             LOGGER.error( "Content entry with name {} has no prompt or keywords and will never get triggered",
                           contentEntryYaml.getName() );
             return null;
         }
+        String filename = contentEntryYaml.getFilename();
+        Path filepath = filename == null ? null : Paths.get( configPath, filename );
         return new ContentEntry( contentEntryYaml.getName(), ContentType.valueOf( contentEntryYaml.getType() ),
                                  contentEntryYaml.getPrompt(), contentEntryYaml.getKeywords(),
-                                 contentEntryYaml.getMessage(), Paths.get( configPath, contentEntryYaml.getFilename() ),
+                                 contentEntryYaml.getMessage(), filepath,
+                                 Utils.getFileContent( Utils.getFileIdFilepath( filepath ) ),
                                  Utils.toMilliseconds( contentEntryYaml.getTimeout() ) );
     }
 }
