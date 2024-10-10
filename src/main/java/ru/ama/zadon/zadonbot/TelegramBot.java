@@ -3,6 +3,7 @@ package ru.ama.zadon.zadonbot;
 import ru.ama.zadon.zadonbot.content.ContentConfig;
 import ru.ama.zadon.zadonbot.content.ContentConfigProvider;
 import ru.ama.zadon.zadonbot.content.ContentEntry;
+import ru.ama.zadon.zadonbot.content.ContentType;
 
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -71,23 +72,62 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
             String messageText = message.getText();
             LOGGER.debug( "Got message: {}", messageText );
 
-            ContentEntry promptedEntry = contentConfig.promptedContents().get( messageText );
-            if ( promptedEntry != null && !promptedEntry.onTimeout() )
+            postContentWithLogging( contentConfig, messageText, message );
+        }
+    }
+
+    private void postContentWithLogging( ContentConfig contentConfig, String messageText, Message message ) {
+        ContentEntry promptedEntry = contentConfig.promptedContents().get( messageText );
+        // Prompted one is fine, anyway you need at first check message, then check timeout
+        if ( promptedEntry != null ) {
+            LOGGER.debug( "Message matched prompt \"{}\" of entry \"{}\"", promptedEntry.getPrompt(), promptedEntry.getName() );
+            if ( promptedEntry.onTimeout() )
+                LOGGER.debug( "Matched entry \"{}\" on timeout", promptedEntry.getName() );
+            else
                 sendContent( message, promptedEntry );
-            else {
-                for ( ContentEntry contentEntry : contentConfig.keywordsContents() ) {
-                    if ( !contentEntry.onTimeout() &&
-                         textContainsKeywords( messageText, contentEntry.getKeywords() ) ) {
-                        sendContent( message, contentEntry );
-                        break; // не копаем дальше контент после отправки
-                    }
+        } else {
+            // Not prompted on the other hand is faster to check for timeout, than for keywords matching
+            if ( LOGGER.isDebugEnabled() ) { // isDebugEnabled outside for, because it can be very slow
+                // so, if debug enabled we check keywords, than timeout. it is slower, but we will see errors in logs
+                checkKeywordsAndPostWithLogging( message, contentConfig );
+            } else {
+                // and if debug is NOT enabled, then we use faster checks
+                // no logging here obviously
+                checkKeywordsAndPostWithoutLogging(message, contentConfig);
+            }
+        }
+    }
+
+    private void checkKeywordsAndPostWithoutLogging( Message message, ContentConfig contentConfig ) {
+        for ( ContentEntry contentEntry : contentConfig.keywordsContents() ) {
+            if ( !contentEntry.onTimeout() &&
+                 textContainsKeywords( message.getText(), contentEntry.getKeywords() ) ) {
+                // no logging
+                sendContent( message, contentEntry );
+                break; // не копаем дальше контент после отправки
+            }
+        }
+    }
+
+    private void checkKeywordsAndPostWithLogging( Message message, ContentConfig contentConfig ) {
+        for ( ContentEntry contentEntry : contentConfig.keywordsContents() ) {
+            Set<String> keywords = contentEntry.getKeywords();
+            if ( textContainsKeywords( message.getText(), keywords ) ) {
+                LOGGER.debug( "Message matched keywords {} of entry \"{}\"", keywords, contentEntry.getName() );
+                if ( contentEntry.onTimeout() )
+                    LOGGER.debug( "Matched entry \"{}\" on timeout", contentEntry.getName() );
+                else {
+                    sendContent( message, contentEntry );
+                    break; // не копаем дальше контент после отправки
                 }
             }
         }
     }
 
     private void sendContent( Message message, ContentEntry contentEntry ) {
-        switch ( contentEntry.getType() ) {
+        ContentType type = contentEntry.getType();
+        LOGGER.debug( "Sending {} for an entry \"{}\"", type, contentEntry.getName() );
+        switch ( type ) {
             case TEXT:
                 sendText( message, contentEntry );
                 break;
@@ -104,7 +144,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
                 sendVoice( message, contentEntry );
                 break;
             default:
-                LOGGER.error( "Not implemented content type: {}", contentEntry.getType() );
+                LOGGER.error( "Not implemented content type: {}", type );
                 break;
         }
     }
@@ -179,11 +219,11 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         InputFile inputFile = getInputFile( fileId, filepath );
 
         SendAnimation sendGif = SendAnimation.builder()
-                                               .chatId( String.valueOf( message.getChatId() ) )
-                                               .caption( contentEntry.getMessage() )
-                                               .animation( inputFile )
-                                               .replyToMessageId( message.getMessageId() )
-                                               .build();
+                                             .chatId( String.valueOf( message.getChatId() ) )
+                                             .caption( contentEntry.getMessage() )
+                                             .animation( inputFile )
+                                             .replyToMessageId( message.getMessageId() )
+                                             .build();
         try {
             Message executed = telegramClient.execute( sendGif );
             if ( fileId == null ) {
