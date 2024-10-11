@@ -6,5 +6,6 @@ public enum ContentType {
     GIF,
     AUDIO,
     VOICE,
-    VIDEO
+    VIDEO,
+    VIDEO_NOTE
 }

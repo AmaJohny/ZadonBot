@@ -33,7 +33,7 @@ import java.util.Set;
 public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThreadUpdateConsumer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( TelegramBot.class );
-    private static final String NON_LETTER_CHAR = "[ !@#$%^&*()_+\\-=`'\"\\\\|/?~0-9.,<>\\[\\]{};:№]";
+    private static final String NON_LETTER_CHAR = "[ !@#$%^&*()_+\\-=`'\"\\\\|/?~.,<>\\[\\]{};:№]";
     public static final String CACHED_FILE_ID_FOR_FILE_MESSAGE = "Cached fileId {} for file {}";
 
     private final BotProperties botProperties;
@@ -70,9 +70,29 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
             Message message = update.getMessage();
             String messageText = message.getText();
             LOGGER.debug( "Got message: {}", messageText );
-
+            if ( messageText.equals( "/help" ) ){
+                sendHelpMessage( message );
+            }
             postContentWithLogging( contentConfig, messageText, message );
         }
+    }
+
+    private void sendHelpMessage( Message message ) {
+        try {
+            sendText( message.getChatId(), message.getMessageId(), getHelpMessage() );
+        } catch ( TelegramApiException e ) {
+            LOGGER.error( "Error while sending message to chat", e );
+        }
+    }
+
+    //TODO Написать нормальный help
+    private String getHelpMessage() {
+        Set<String> prompts = contentConfigProvider.getContentConfig().promptedContents().keySet();
+        StringBuilder helpMessage = new StringBuilder("Список команд:\n").append( "/help\n" );
+        for ( String prompt : prompts ) {
+            helpMessage.append( prompt ).append( "\n" );
+        }
+        return helpMessage.toString();
     }
 
     private void postContentWithLogging( ContentConfig contentConfig, String messageText, Message message ) {
@@ -108,6 +128,14 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         }
     }
 
+    private boolean textContainsKeywords( String messageText, Set<String> keywords ) {
+        for ( String word : messageText.toLowerCase().split( NON_LETTER_CHAR ) ) {
+            if ( keywords.contains( word ) )
+                return true;
+        }
+        return false;
+    }
+
     private void checkKeywordsAndPostWithLogging( Message message, ContentConfig contentConfig ) {
         for ( ContentEntry contentEntry : contentConfig.keywordsContents() ) {
             Set<String> keywords = contentEntry.getKeywords();
@@ -141,6 +169,12 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
                 break;
             case VOICE:
                 sendVoice( message, contentEntry );
+                break;
+            case VIDEO:
+                sendVideo( message, contentEntry );
+                break;
+            case VIDEO_NOTE:
+                sendVideoNote( message, contentEntry );
                 break;
             default:
                 LOGGER.error( "Not implemented content type: {}", type );
@@ -284,11 +318,50 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         }
     }
 
-    private boolean textContainsKeywords( String messageText, Set<String> keywords ) {
-        for ( String word : messageText.toLowerCase().split( NON_LETTER_CHAR ) ) {
-            if ( keywords.contains( word ) )
-                return true;
+    private void sendVideo( Message message, ContentEntry contentEntry ) {
+        String fileId = contentEntry.getFileId();
+        Path filepath = contentEntry.getFilepath();
+        InputFile inputFile = getInputFile( fileId, filepath );
+
+        SendVideo sendAudio = SendVideo.builder()
+                                       .chatId( String.valueOf( message.getChatId() ) )
+                                       .caption( contentEntry.getMessage() )
+                                       .video( inputFile )
+                                       .replyToMessageId( message.getMessageId() )
+                                       .build();
+
+        try {
+            Message executed = telegramClient.execute( sendAudio );
+            if ( fileId == null ) {
+                fileId = executed.getVideo().getFileId();
+                contentEntry.saveFileId( fileId );
+                LOGGER.debug( CACHED_FILE_ID_FOR_FILE_MESSAGE, fileId, filepath );
+            }
+        } catch ( TelegramApiException e ) {
+            LOGGER.error( "Error while sending image to chat", e );
         }
-        return false;
+    }
+
+    private void sendVideoNote( Message message, ContentEntry contentEntry ) {
+        String fileId = contentEntry.getFileId();
+        Path filepath = contentEntry.getFilepath();
+        InputFile inputFile = getInputFile( fileId, filepath );
+
+        SendVideoNote sendAudio = SendVideoNote.builder()
+                                               .chatId( String.valueOf( message.getChatId() ) )
+                                               .videoNote( inputFile )
+                                               .replyToMessageId( message.getMessageId() )
+                                               .build();
+
+        try {
+            Message executed = telegramClient.execute( sendAudio );
+            if ( fileId == null ) {
+                fileId = executed.getVideoNote().getFileId();
+                contentEntry.saveFileId( fileId );
+                LOGGER.debug( CACHED_FILE_ID_FOR_FILE_MESSAGE, fileId, filepath );
+            }
+        } catch ( TelegramApiException e ) {
+            LOGGER.error( "Error while sending image to chat", e );
+        }
     }
 }
