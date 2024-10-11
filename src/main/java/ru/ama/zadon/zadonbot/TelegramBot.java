@@ -5,6 +5,7 @@ import ru.ama.zadon.zadonbot.content.ContentConfigProvider;
 import ru.ama.zadon.zadonbot.content.ContentEntry;
 import ru.ama.zadon.zadonbot.content.ContentType;
 
+import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +17,7 @@ import org.telegram.telegrambots.longpolling.starter.AfterBotRegistration;
 import org.telegram.telegrambots.longpolling.starter.SpringLongPollingBot;
 import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
 import org.telegram.telegrambots.meta.api.methods.send.*;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessages;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -25,9 +27,7 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Component
 public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThreadUpdateConsumer {
@@ -39,6 +39,8 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
     private final BotProperties botProperties;
     private final ContentConfigProvider contentConfigProvider;
     private final TelegramClient telegramClient;
+
+    private final Map<String, Queue<Integer>> lastMessages = new HashMap<>();
 
     @Autowired
     public TelegramBot( BotProperties botProperties, ContentConfigProvider contentConfigProvider,
@@ -70,25 +72,50 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
             Message message = update.getMessage();
             String messageText = message.getText();
             LOGGER.debug( "Got message: {}", messageText );
-            if ( messageText.equals( "/help" ) ){
+            if ( messageText.equals( "/help" ) ) {
                 sendHelpMessage( message );
+            }
+            if ( messageText.equals( "/иди-нахуй" ) ) {
+                deleteMessageHistory( message );
             }
             postContentWithLogging( contentConfig, messageText, message );
         }
     }
 
-    private void sendHelpMessage( Message message ) {
-        try {
-            sendText( message.getChatId(), message.getMessageId(), getHelpMessage() );
-        } catch ( TelegramApiException e ) {
-            LOGGER.error( "Error while sending message to chat", e );
+    private void deleteMessageHistory( Message message ) {
+        String chatId = String.valueOf( message.getChatId() );
+        Queue<Integer> messageHistory = lastMessages.get( chatId );
+        if ( messageHistory != null ) {
+            List<Integer> messageIds = new ArrayList<>();
+            Integer messageId;
+            while ( (messageId = messageHistory.poll()) != null ) {
+                messageIds.add( messageId );
+            }
+            LOGGER.debug( "Deleting {} last messages", messageIds.size() );
+            DeleteMessages deleteMessages = DeleteMessages.builder()
+                                                          .chatId( chatId )
+                                                          .messageIds( messageIds )
+                                                          .build();
+            try {
+                telegramClient.execute( deleteMessages );
+            } catch ( TelegramApiException e ) {
+                LOGGER.error( "Error while deleting messages", e );
+            }
         }
+
+    }
+
+    private void sendHelpMessage( Message message ) {
+        Message sentMessage = sendText( message.getChatId(), message.getMessageId(), getHelpMessage() );
+        fillMessageHistory( sentMessage );
     }
 
     //TODO Написать нормальный help
     private String getHelpMessage() {
         Set<String> prompts = contentConfigProvider.getContentConfig().promptedContents().keySet();
-        StringBuilder helpMessage = new StringBuilder("Список команд:\n").append( "/help\n" );
+        StringBuilder helpMessage = new StringBuilder( "Список команд:\n" )
+                                        .append( "/help\n" )
+                                        .append( "/иди-нахуй Удалить 20 последних сообщений бота\n" );
         for ( String prompt : prompts ) {
             helpMessage.append( prompt ).append( "\n" );
         }
@@ -112,7 +139,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
             } else {
                 // and if debug is NOT enabled, then we use faster checks
                 // no logging here obviously
-                checkKeywordsAndPostWithoutLogging(message, contentConfig);
+                checkKeywordsAndPostWithoutLogging( message, contentConfig );
             }
         }
     }
@@ -154,59 +181,77 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
     private void sendContent( Message message, ContentEntry contentEntry ) {
         ContentType type = contentEntry.getType();
         LOGGER.debug( "Sending {} for an entry \"{}\"", type, contentEntry.getName() );
+        Message sentMessage = null;
         switch ( type ) {
             case TEXT:
-                sendText( message, contentEntry );
+                sentMessage = sendText( message, contentEntry );
                 break;
             case IMAGE:
-                sendImage( message, contentEntry );
+                sentMessage = sendImage( message, contentEntry );
                 break;
             case GIF:
-                sendGif( message, contentEntry );
+                sentMessage = sendGif( message, contentEntry );
                 break;
             case AUDIO:
-                sendAudio( message, contentEntry );
+                sentMessage = sendAudio( message, contentEntry );
                 break;
             case VOICE:
-                sendVoice( message, contentEntry );
+                sentMessage = sendVoice( message, contentEntry );
                 break;
             case VIDEO:
-                sendVideo( message, contentEntry );
+                sentMessage = sendVideo( message, contentEntry );
                 break;
             case VIDEO_NOTE:
-                sendVideoNote( message, contentEntry );
+                sentMessage = sendVideoNote( message, contentEntry );
                 break;
             default:
                 LOGGER.error( "Not implemented content type: {}", type );
                 break;
         }
+        fillMessageHistory( sentMessage );
     }
 
-    private void sendText( Message message, ContentEntry contentEntry ) {
+    private void fillMessageHistory( Message sentMessage ) {
+        if ( sentMessage != null ) {
+            Queue<Integer> messageHistory =
+                lastMessages.computeIfAbsent( String.valueOf( sentMessage.getChatId() ),
+                                              ( chatId ) -> new CircularFifoQueue<>( 20 ) );
+            messageHistory.add( sentMessage.getMessageId() );
+        }
+    }
+
+    private Message sendText( Message message, ContentEntry contentEntry ) {
+        String textToSend;
         try {
-            String textToSend;
             Path filepath = contentEntry.getFilepath();
             if ( filepath == null ) {
                 textToSend = contentEntry.getMessage();
             } else {
                 textToSend = Utils.getFileContent( filepath );
             }
-            sendText( message.getChatId(), message.getMessageId(), textToSend );
-        } catch ( IOException | TelegramApiException e ) {
+        } catch ( IOException e ) {
             LOGGER.error( "Error while sending message to chat", e );
+            return null;
         }
+        return sendText( message.getChatId(), message.getMessageId(), textToSend );
     }
 
-    private void sendText( Long chatId, Integer messageIdToReply, String textToSend ) throws TelegramApiException {
+    private Message sendText( Long chatId, Integer messageIdToReply, String textToSend ) {
         SendMessage sendMessage = SendMessage.builder()
                                              .chatId( String.valueOf( chatId ) )
                                              .text( textToSend )
                                              .replyToMessageId( messageIdToReply )
                                              .build();
-        telegramClient.execute( sendMessage );
+        Message executed = null;
+        try {
+            executed = telegramClient.execute( sendMessage );
+        } catch ( TelegramApiException e ) {
+            LOGGER.error( "Error while sending image to chat", e );
+        }
+        return executed;
     }
 
-    private void sendImage( Message message, ContentEntry contentEntry ) {
+    private Message sendImage( Message message, ContentEntry contentEntry ) {
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
@@ -217,8 +262,9 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
                                        .photo( inputFile )
                                        .replyToMessageId( message.getMessageId() )
                                        .build();
+        Message executed = null;
         try {
-            Message executed = telegramClient.execute( sendPhoto );
+            executed = telegramClient.execute( sendPhoto );
             if ( fileId == null ) {
                 fileId = getMaxSizeFileId( executed.getPhoto() );
                 contentEntry.saveFileId( fileId );
@@ -227,6 +273,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         } catch ( TelegramApiException e ) {
             LOGGER.error( "Error while sending image to chat", e );
         }
+        return executed;
     }
 
     @NotNull
@@ -247,7 +294,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
                      .orElse( null );// will never be used
     }
 
-    private void sendGif( Message message, ContentEntry contentEntry ) {
+    private Message sendGif( Message message, ContentEntry contentEntry ) {
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
@@ -258,8 +305,9 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
                                              .animation( inputFile )
                                              .replyToMessageId( message.getMessageId() )
                                              .build();
+        Message executed = null;
         try {
-            Message executed = telegramClient.execute( sendGif );
+            executed = telegramClient.execute( sendGif );
             if ( fileId == null ) {
                 fileId = executed.getAnimation().getFileId();
                 contentEntry.saveFileId( fileId );
@@ -268,9 +316,10 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         } catch ( TelegramApiException e ) {
             LOGGER.error( "Error while sending image to chat", e );
         }
+        return executed;
     }
 
-    private void sendAudio( Message message, ContentEntry contentEntry ) {
+    private Message sendAudio( Message message, ContentEntry contentEntry ) {
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
@@ -281,9 +330,9 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
                                        .audio( inputFile )
                                        .replyToMessageId( message.getMessageId() )
                                        .build();
-
+        Message executed = null;
         try {
-            Message executed = telegramClient.execute( sendAudio );
+            executed = telegramClient.execute( sendAudio );
             if ( fileId == null ) {
                 fileId = executed.getAudio().getFileId();
                 contentEntry.saveFileId( fileId );
@@ -292,9 +341,10 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         } catch ( TelegramApiException e ) {
             LOGGER.error( "Error while sending image to chat", e );
         }
+        return executed;
     }
 
-    private void sendVoice( Message message, ContentEntry contentEntry ) {
+    private Message sendVoice( Message message, ContentEntry contentEntry ) {
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
@@ -305,9 +355,9 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
                                        .voice( inputFile )
                                        .replyToMessageId( message.getMessageId() )
                                        .build();
-
+        Message executed = null;
         try {
-            Message executed = telegramClient.execute( sendAudio );
+            executed = telegramClient.execute( sendAudio );
             if ( fileId == null ) {
                 fileId = executed.getVoice().getFileId();
                 contentEntry.saveFileId( fileId );
@@ -316,9 +366,10 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         } catch ( TelegramApiException e ) {
             LOGGER.error( "Error while sending image to chat", e );
         }
+        return executed;
     }
 
-    private void sendVideo( Message message, ContentEntry contentEntry ) {
+    private Message sendVideo( Message message, ContentEntry contentEntry ) {
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
@@ -329,9 +380,9 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
                                        .video( inputFile )
                                        .replyToMessageId( message.getMessageId() )
                                        .build();
-
+        Message executed = null;
         try {
-            Message executed = telegramClient.execute( sendAudio );
+            executed = telegramClient.execute( sendAudio );
             if ( fileId == null ) {
                 fileId = executed.getVideo().getFileId();
                 contentEntry.saveFileId( fileId );
@@ -340,9 +391,10 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         } catch ( TelegramApiException e ) {
             LOGGER.error( "Error while sending image to chat", e );
         }
+        return executed;
     }
 
-    private void sendVideoNote( Message message, ContentEntry contentEntry ) {
+    private Message sendVideoNote( Message message, ContentEntry contentEntry ) {
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
@@ -352,9 +404,9 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
                                                .videoNote( inputFile )
                                                .replyToMessageId( message.getMessageId() )
                                                .build();
-
+        Message executed = null;
         try {
-            Message executed = telegramClient.execute( sendAudio );
+            executed = telegramClient.execute( sendAudio );
             if ( fileId == null ) {
                 fileId = executed.getVideoNote().getFileId();
                 contentEntry.saveFileId( fileId );
@@ -363,5 +415,6 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         } catch ( TelegramApiException e ) {
             LOGGER.error( "Error while sending image to chat", e );
         }
+        return executed;
     }
 }
