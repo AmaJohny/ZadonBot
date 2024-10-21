@@ -6,6 +6,7 @@ import ru.ama.zadon.zadonbot.content.ContentEntry;
 import ru.ama.zadon.zadonbot.content.ContentType;
 
 import org.apache.commons.collections4.queue.CircularFifoQueue;
+import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,12 +36,14 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
     private static final Logger LOGGER = LoggerFactory.getLogger( TelegramBot.class );
     private static final String NON_LETTER_CHAR = "[ !@#$%^&*()_+\\-=`'\"\\\\|/?~.,<>\\[\\]{};:№]";
     public static final String CACHED_FILE_ID_FOR_FILE_MESSAGE = "Cached fileId {} for file {}";
+    // через 48 часов нельзя удалить сообщение, делаем погрешность в пару часов
+    private static final long MAX_MESSAGE_AGE = 46 * 60 * 60 * 1000L;
 
     private final BotProperties botProperties;
     private final ContentConfigProvider contentConfigProvider;
     private final TelegramClient telegramClient;
 
-    private final Map<String, Queue<Integer>> lastMessages = new HashMap<>();
+    private final Map<String, Queue<Pair<Integer, Long>>> lastMessages = new HashMap<>();
 
     @Autowired
     public TelegramBot( BotProperties botProperties, ContentConfigProvider contentConfigProvider,
@@ -84,12 +87,16 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
 
     private void deleteMessageHistory( Message message ) {
         String chatId = String.valueOf( message.getChatId() );
-        Queue<Integer> messageHistory = lastMessages.get( chatId );
+        Queue<Pair<Integer, Long>> messageHistory = lastMessages.get( chatId );
         if ( messageHistory != null ) {
             List<Integer> messageIds = new ArrayList<>();
-            Integer messageId;
-            while ( (messageId = messageHistory.poll()) != null ) {
-                messageIds.add( messageId );
+            Pair<Integer, Long> savedMessage;
+            long currentTime = System.currentTimeMillis();
+            while ( (savedMessage = messageHistory.poll()) != null ) {
+                if ( currentTime - savedMessage.getRight() < MAX_MESSAGE_AGE )
+                    messageIds.add( savedMessage.getLeft() );
+                else
+                    LOGGER.debug( "Tried to delete message that is older than 46 hours" );
             }
             LOGGER.debug( "Deleting {} last messages", messageIds.size() );
             DeleteMessages deleteMessages = DeleteMessages.builder()
@@ -213,10 +220,10 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
 
     private void fillMessageHistory( Message sentMessage ) {
         if ( sentMessage != null ) {
-            Queue<Integer> messageHistory =
+            Queue<Pair<Integer, Long>> messageHistory =
                 lastMessages.computeIfAbsent( String.valueOf( sentMessage.getChatId() ),
                                               ( chatId ) -> new CircularFifoQueue<>( 20 ) );
-            messageHistory.add( sentMessage.getMessageId() );
+            messageHistory.add( Pair.of( sentMessage.getMessageId(), System.currentTimeMillis() ) );
         }
     }
 
