@@ -81,6 +81,7 @@ public class GitContentConfigProvider implements ContentConfigProvider {
             LOGGER.debug( "Repo exists, pulling updates" );
             boolean upToDate = false;
             try {
+                GitActions.updateRemoteUrl( gitProperties.getRepoDir(), gitProperties.getRepoUrl(), gitProperties.getToken() );
                 upToDate = GitActions.pullFromRepo( gitProperties.getRepoDir() );
             } catch ( IOException e ) {
                 LOGGER.error( "Error while pulling from repo", e );

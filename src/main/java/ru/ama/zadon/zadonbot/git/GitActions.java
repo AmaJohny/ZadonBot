@@ -15,6 +15,14 @@ public class GitActions {
 
     private static final String UP_TO_DATE_MESSAGE = "Already up to date.";
 
+    public static void updateRemoteUrl( String dir, String url, String accessToken ) throws IOException {
+        ProcessBuilder pb = new ProcessBuilder();
+        pb.directory( new File( dir ) );
+        pb.command( "git", "remote", "set-url", "origin", getRepoUrl( url, accessToken ) );
+        pb.redirectErrorStream(true);
+        executeProcess( pb );
+    }
+
     public static boolean pullFromRepo( String dir ) throws IOException {
         // Вызов скрипта, который пулит данные
         ProcessBuilder pb = new ProcessBuilder();
@@ -62,8 +70,13 @@ public class GitActions {
         // Вызов скрипта, который пулит данные
         ProcessBuilder pb = new ProcessBuilder();
         pb.directory( new File( dir ) );
-        pb.command( "git", "clone", repoUrl.replace( "{token}", accessToken ), "." );
+        pb.command( "git", "clone", getRepoUrl( repoUrl, accessToken ), "." );
         pb.redirectErrorStream(true);
         executeProcess( pb );
+    }
+
+    @NotNull
+    private static String getRepoUrl( String repoUrl, String accessToken ) {
+        return repoUrl.replace( "{token}", accessToken );
     }
 }
