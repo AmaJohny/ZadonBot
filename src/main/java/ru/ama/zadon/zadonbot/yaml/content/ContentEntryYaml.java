@@ -1,19 +1,20 @@
 package ru.ama.zadon.zadonbot.yaml.content;
 
+import java.util.Set;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
-
-import java.util.Set;
 
 public class ContentEntryYaml {
 
     private String name;
     private String type;
+    private String description;
     private Set<String> keywords;
     private String prompt;
     private String message;
     private String filename;
     private String timeout;
+    private String probability;
 
     @Nonnull
     public String getName() {
@@ -31,6 +32,15 @@ public class ContentEntryYaml {
 
     public void setType( @Nonnull String type ) {
         this.type = type;
+    }
+
+    @Nullable
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription( @Nullable String description ) {
+        this.description = description;
     }
 
     @Nullable
@@ -76,5 +86,14 @@ public class ContentEntryYaml {
 
     public void setTimeout( @Nullable String timeout ) {
         this.timeout = timeout;
+    }
+
+    @Nullable
+    public String getProbability() {
+        return probability;
+    }
+
+    public void setProbability( @Nullable String probability ) {
+        this.probability = probability;
     }
 }

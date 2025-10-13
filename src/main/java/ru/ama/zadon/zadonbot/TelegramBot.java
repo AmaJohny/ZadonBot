@@ -12,11 +12,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.telegram.telegrambots.longpolling.BotSession;
 import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsumer;
 import org.telegram.telegrambots.longpolling.starter.AfterBotRegistration;
 import org.telegram.telegrambots.longpolling.starter.SpringLongPollingBot;
 import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
+import org.telegram.telegrambots.meta.api.methods.ActionType;
 import org.telegram.telegrambots.meta.api.methods.send.*;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessages;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
@@ -81,10 +83,33 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
             if ( messageText.equals( "/иди-нахуй" ) ) {
                 deleteMessageHistory( message );
             }
+            if ( messageText.equals( "/roll" ) )
+                sendRoll( message );
             postContentWithLogging( contentConfig, messageText, message );
         }
     }
 
+    private void sendHelpMessage( Message message ) {
+        Message sentMessage = sendText( message.getChatId(), message.getMessageId(), getHelpMessage() );
+        fillMessageHistory( sentMessage );
+    }
+
+    //TODO Написать нормальный help
+    private String getHelpMessage() {
+        StringBuilder helpMessage = new StringBuilder( "Список команд:\n" )
+                                        .append( "/help\n" )
+                                        .append( "/roll Случайное число от 0 до 100\n" )
+                                        .append( "/иди-нахуй Удалить 20 последних сообщений бота\n" );
+        for ( ContentEntry contentEntry : contentConfigProvider.getContentConfig().promptedContents().values() ) {
+            helpMessage.append( contentEntry.getPrompt() );
+            String description = contentEntry.getDescription();
+            if ( StringUtils.hasText( description ) ) {
+                helpMessage.append( " " ).append( description );
+            }
+            helpMessage.append( "\n" );
+        }
+        return helpMessage.toString();
+    }
     private void deleteMessageHistory( Message message ) {
         String chatId = String.valueOf( message.getChatId() );
         Queue<Pair<Integer, Long>> messageHistory = lastMessages.get( chatId );
@@ -112,52 +137,55 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
 
     }
 
-    private void sendHelpMessage( Message message ) {
-        Message sentMessage = sendText( message.getChatId(), message.getMessageId(), getHelpMessage() );
+    private void sendRoll( Message message ) {
+        long rollValue = Math.round( Math.random() * 100 );
+        Message sentMessage = sendText( message.getChatId(), message.getMessageId(), "Ваше число " + rollValue );
         fillMessageHistory( sentMessage );
-    }
-
-    //TODO Написать нормальный help
-    private String getHelpMessage() {
-        Set<String> prompts = contentConfigProvider.getContentConfig().promptedContents().keySet();
-        StringBuilder helpMessage = new StringBuilder( "Список команд:\n" )
-                                        .append( "/help\n" )
-                                        .append( "/иди-нахуй Удалить 20 последних сообщений бота\n" );
-        for ( String prompt : prompts ) {
-            helpMessage.append( prompt ).append( "\n" );
-        }
-        return helpMessage.toString();
     }
 
     private void postContentWithLogging( ContentConfig contentConfig, String messageText, Message message ) {
         ContentEntry promptedEntry = contentConfig.promptedContents().get( messageText );
         // Prompted one is fine, anyway you need at first check message, then check timeout
         if ( promptedEntry != null ) {
-            LOGGER.debug( "Message matched prompt \"{}\" of entry \"{}\"", promptedEntry.getPrompt(), promptedEntry.getName() );
+            String entryName = promptedEntry.getName();
+            LOGGER.debug( "Message matched prompt \"{}\" of entry \"{}\"", promptedEntry.getPrompt(), entryName );
             if ( promptedEntry.onTimeout() )
-                LOGGER.debug( "Matched entry \"{}\" on timeout", promptedEntry.getName() );
+                LOGGER.debug( "Matched entry \"{}\" on timeout", entryName );
             else
+                //do not check probability on prompt
                 sendContent( message, promptedEntry );
         } else {
             // Not prompted on the other hand is faster to check for timeout, than for keywords matching
             if ( LOGGER.isDebugEnabled() ) { // isDebugEnabled outside for, because it can be very slow
-                // so, if debug enabled we check keywords, than timeout. it is slower, but we will see errors in logs
+                // so, if debug enabled we check keywords first, than timeout. it is slower, but we will see errors in logs
                 checkKeywordsAndPostWithLogging( message, contentConfig );
             } else {
-                // and if debug is NOT enabled, then we use faster checks
-                // no logging here obviously
+                // and if debug is NOT enabled, then we use faster checks no logging here obviously
                 checkKeywordsAndPostWithoutLogging( message, contentConfig );
             }
         }
     }
 
-    private void checkKeywordsAndPostWithoutLogging( Message message, ContentConfig contentConfig ) {
+    private boolean hitProbability( double probability ) {
+        double hitValue = Math.random();
+        return hitValue < probability;
+    }
+
+    private void checkKeywordsAndPostWithLogging( Message message, ContentConfig contentConfig ) {
         for ( ContentEntry contentEntry : contentConfig.keywordsContents() ) {
-            if ( !contentEntry.onTimeout() &&
-                 textContainsKeywords( message.getText(), contentEntry.getKeywords() ) ) {
-                // no logging
-                sendContent( message, contentEntry );
-                break; // не копаем дальше контент после отправки
+            Set<String> keywords = contentEntry.getKeywords();
+            if ( textContainsKeywords( message.getText(), keywords ) ) {
+                String entryName = contentEntry.getName();
+                LOGGER.debug( "Message matched keywords {} of entry \"{}\"", keywords, entryName );
+                if ( contentEntry.onTimeout() )
+                    LOGGER.debug( "Matched entry \"{}\" on timeout", entryName );
+                else if ( !hitProbability( contentEntry.getProbability() ) )
+                    LOGGER.debug( "Matched entry \"{}\" did not hit probability {}",
+                                  entryName, Utils.toPercents( contentEntry.getProbability() ) );
+                else {
+                    sendContent( message, contentEntry );
+                }
+                break; // не копаем дальше контент после попадания
             }
         }
     }
@@ -170,17 +198,15 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         return false;
     }
 
-    private void checkKeywordsAndPostWithLogging( Message message, ContentConfig contentConfig ) {
+    private void checkKeywordsAndPostWithoutLogging( Message message, ContentConfig contentConfig ) {
         for ( ContentEntry contentEntry : contentConfig.keywordsContents() ) {
-            Set<String> keywords = contentEntry.getKeywords();
-            if ( textContainsKeywords( message.getText(), keywords ) ) {
-                LOGGER.debug( "Message matched keywords {} of entry \"{}\"", keywords, contentEntry.getName() );
-                if ( contentEntry.onTimeout() )
-                    LOGGER.debug( "Matched entry \"{}\" on timeout", contentEntry.getName() );
-                else {
+            if ( !contentEntry.onTimeout() &&
+                 textContainsKeywords( message.getText(), contentEntry.getKeywords() ) ) {
+                if ( hitProbability( contentEntry.getProbability() ) ) {
+                    // no logging
                     sendContent( message, contentEntry );
-                    break; // не копаем дальше контент после отправки
                 }
+                break; // не копаем дальше контент после попадания
             }
         }
     }
@@ -215,6 +241,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
                 LOGGER.error( "Not implemented content type: {}", type );
                 break;
         }
+        contentEntry.updateLastUseTime();
         fillMessageHistory( sentMessage );
     }
 
@@ -243,7 +270,17 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         return sendText( message.getChatId(), message.getMessageId(), textToSend );
     }
 
+    private void imitateAction( String chatId, ActionType actionType ) {
+        try {
+            telegramClient.execute( new SendChatAction( chatId, actionType.toString() ) );
+            Thread.sleep( 2_000L );
+        } catch ( Exception e ) {
+            LOGGER.error( "Error while imitating action", e );
+        }
+    }
+
     private Message sendText( Long chatId, Integer messageIdToReply, String textToSend ) {
+        imitateAction( chatId.toString(), ActionType.TYPING );
         SendMessage sendMessage = SendMessage.builder()
                                              .chatId( String.valueOf( chatId ) )
                                              .text( textToSend )
@@ -262,6 +299,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
+        imitateAction( message.getChatId().toString(), ActionType.UPLOAD_PHOTO );
 
         SendPhoto sendPhoto = SendPhoto.builder()
                                        .chatId( String.valueOf( message.getChatId() ) )
@@ -305,6 +343,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
+        imitateAction( message.getChatId().toString(), ActionType.UPLOAD_PHOTO );
 
         SendAnimation sendGif = SendAnimation.builder()
                                              .chatId( String.valueOf( message.getChatId() ) )
@@ -330,6 +369,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
+        imitateAction( message.getChatId().toString(), ActionType.UPLOAD_VOICE );
 
         SendAudio sendAudio = SendAudio.builder()
                                        .chatId( String.valueOf( message.getChatId() ) )
@@ -355,6 +395,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
+        imitateAction( message.getChatId().toString(), ActionType.RECORD_VOICE );
 
         SendVoice sendAudio = SendVoice.builder()
                                        .chatId( String.valueOf( message.getChatId() ) )
@@ -380,6 +421,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
+        imitateAction( message.getChatId().toString(), ActionType.UPLOAD_VIDEO );
 
         SendVideo sendAudio = SendVideo.builder()
                                        .chatId( String.valueOf( message.getChatId() ) )
@@ -405,6 +447,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
+        imitateAction( message.getChatId().toString(), ActionType.RECORD_VIDEO_NOTE );
 
         SendVideoNote sendAudio = SendVideoNote.builder()
                                                .chatId( String.valueOf( message.getChatId() ) )
