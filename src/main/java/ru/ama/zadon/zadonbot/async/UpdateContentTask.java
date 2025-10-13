@@ -87,6 +87,7 @@ public class UpdateContentTask implements Runnable {
         String filename = contentEntryYaml.getFilename();
         Path filepath = filename == null ? null : Paths.get( configPath, filename );
         return new ContentEntry( entryName, ContentType.valueOf( contentEntryYaml.getType() ),
+                                 contentEntryYaml.getDescription(),
                                  contentEntryYaml.getPrompt(), contentEntryYaml.getKeywords(),
                                  contentEntryYaml.getMessage(), filepath,
                                  Utils.getFileContent( Utils.getFileIdFilepath( filepath ) ),

@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.telegram.telegrambots.longpolling.BotSession;
 import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsumer;
 import org.telegram.telegrambots.longpolling.starter.AfterBotRegistration;
@@ -81,10 +82,33 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
             if ( messageText.equals( "/иди-нахуй" ) ) {
                 deleteMessageHistory( message );
             }
+            if ( messageText.equals( "/roll" ) )
+                sendRoll( message );
             postContentWithLogging( contentConfig, messageText, message );
         }
     }
 
+    private void sendHelpMessage( Message message ) {
+        Message sentMessage = sendText( message.getChatId(), message.getMessageId(), getHelpMessage() );
+        fillMessageHistory( sentMessage );
+    }
+
+    //TODO Написать нормальный help
+    private String getHelpMessage() {
+        StringBuilder helpMessage = new StringBuilder( "Список команд:\n" )
+                                        .append( "/help\n" )
+                                        .append( "/roll Случайное число от 0 до 100\n" )
+                                        .append( "/иди-нахуй Удалить 20 последних сообщений бота\n" );
+        for ( ContentEntry contentEntry : contentConfigProvider.getContentConfig().promptedContents().values() ) {
+            helpMessage.append( contentEntry.getPrompt() );
+            String description = contentEntry.getDescription();
+            if ( StringUtils.hasText( description ) ) {
+                helpMessage.append( " " ).append( description );
+            }
+            helpMessage.append( "\n" );
+        }
+        return helpMessage.toString();
+    }
     private void deleteMessageHistory( Message message ) {
         String chatId = String.valueOf( message.getChatId() );
         Queue<Pair<Integer, Long>> messageHistory = lastMessages.get( chatId );
@@ -112,21 +136,10 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
 
     }
 
-    private void sendHelpMessage( Message message ) {
-        Message sentMessage = sendText( message.getChatId(), message.getMessageId(), getHelpMessage() );
+    private void sendRoll( Message message ) {
+        long rollValue = Math.round( Math.random() * 100 );
+        Message sentMessage = sendText( message.getChatId(), message.getMessageId(), "Ваше число " + rollValue );
         fillMessageHistory( sentMessage );
-    }
-
-    //TODO Написать нормальный help
-    private String getHelpMessage() {
-        Set<String> prompts = contentConfigProvider.getContentConfig().promptedContents().keySet();
-        StringBuilder helpMessage = new StringBuilder( "Список команд:\n" )
-                                        .append( "/help\n" )
-                                        .append( "/иди-нахуй Удалить 20 последних сообщений бота\n" );
-        for ( String prompt : prompts ) {
-            helpMessage.append( prompt ).append( "\n" );
-        }
-        return helpMessage.toString();
     }
 
     private void postContentWithLogging( ContentConfig contentConfig, String messageText, Message message ) {
@@ -227,6 +240,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
                 LOGGER.error( "Not implemented content type: {}", type );
                 break;
         }
+        contentEntry.updateLastUseTime();
         fillMessageHistory( sentMessage );
     }
 

@@ -2,6 +2,7 @@ package ru.ama.zadon.zadonbot;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -46,7 +47,7 @@ public class Utils {
 
     public static double toProbability( String stringProbability, String entryName ) {
         double probability;
-        if ( stringProbability == null || stringProbability.isEmpty() ) {
+        if ( !StringUtils.hasText( stringProbability ) ) {
             probability = 1;
         } else if ( stringProbability.trim().endsWith( "%" ) ) {
             stringProbability = stringProbability.substring( 0, stringProbability.length() - 1 );

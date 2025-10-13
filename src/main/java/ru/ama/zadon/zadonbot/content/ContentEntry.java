@@ -13,6 +13,7 @@ public class ContentEntry {
 
     private final String name;
     private final ContentType type;
+    private final String description;
     private final String prompt;
     private final Set<String> keywords;
     private final String message;
@@ -25,11 +26,13 @@ public class ContentEntry {
     private volatile String fileId;
 
     public ContentEntry( @Nonnull String name, @Nonnull ContentType type,
+                         @Nullable String description,
                          @Nullable String prompt, @Nullable Set<String> keywords,
                          @Nullable String message, @Nullable Path filepath, @Nullable String fileId,
                          long timeout, double probability ) {
         this.name = name;
         this.type = type;
+        this.description = description;
         this.prompt = prompt;
         this.keywords = keywords;
         this.message = message;
@@ -45,6 +48,10 @@ public class ContentEntry {
 
     public ContentType getType() {
         return type;
+    }
+
+    public String getDescription() {
+        return description;
     }
 
     public String getPrompt() {
@@ -69,8 +76,11 @@ public class ContentEntry {
 
         long lastPastedTimeLong = lastUseTime.get();
         long currentTime = System.currentTimeMillis();
-        return !(currentTime > lastPastedTimeLong + timeout &&
-                 lastUseTime.compareAndSet( lastPastedTimeLong, currentTime ));
+        return !(currentTime > lastPastedTimeLong + timeout);
+    }
+
+    public void updateLastUseTime() {
+        lastUseTime.set(System.currentTimeMillis());
     }
 
     public long getTimeout() {

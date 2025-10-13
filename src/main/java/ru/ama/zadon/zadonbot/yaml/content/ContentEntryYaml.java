@@ -8,6 +8,7 @@ public class ContentEntryYaml {
 
     private String name;
     private String type;
+    private String description;
     private Set<String> keywords;
     private String prompt;
     private String message;
@@ -31,6 +32,15 @@ public class ContentEntryYaml {
 
     public void setType( @Nonnull String type ) {
         this.type = type;
+    }
+
+    @Nullable
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription( @Nullable String description ) {
+        this.description = description;
     }
 
     @Nullable
