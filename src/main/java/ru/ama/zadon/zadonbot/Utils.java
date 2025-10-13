@@ -1,5 +1,8 @@
 package ru.ama.zadon.zadonbot;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -8,6 +11,8 @@ import java.nio.file.Paths;
 import java.time.Duration;
 
 public class Utils {
+
+    public static Logger LOGGER = LoggerFactory.getLogger( Utils.class );
 
     public static final String FILE_ID_FILE_SUFFIX = ".fid";
 
@@ -37,5 +42,26 @@ public class Utils {
         if ( filepath == null )
             return null;
         return Paths.get( filepath + FILE_ID_FILE_SUFFIX );
+    }
+
+    public static double toProbability( String stringProbability, String entryName ) {
+        double probability;
+        if ( stringProbability == null || stringProbability.isEmpty() ) {
+            probability = 1;
+        } else if ( stringProbability.trim().endsWith( "%" ) ) {
+            stringProbability = stringProbability.substring( 0, stringProbability.length() - 1 );
+            probability = Float.parseFloat( stringProbability ) / 100f;
+        } else {
+            probability = Float.parseFloat( stringProbability );
+        }
+        if ( probability < 0 || probability > 1 ) {
+            LOGGER.warn( "Probability value out of range [0,1]: {} for entry {}", stringProbability, entryName );
+            probability = 1;
+        }
+        return probability;
+    }
+
+    public static String toPercents( double probability ) {
+        return Math.round( probability * 100.0 ) + "%";
     }
 }

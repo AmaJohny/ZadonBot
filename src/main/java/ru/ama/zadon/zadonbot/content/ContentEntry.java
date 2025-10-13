@@ -2,13 +2,12 @@ package ru.ama.zadon.zadonbot.content;
 
 import ru.ama.zadon.zadonbot.Utils;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 
 public class ContentEntry {
 
@@ -19,6 +18,7 @@ public class ContentEntry {
     private final String message;
     private final Path filepath;
     private final long timeout;
+    private final double probability;
 
     private final AtomicLong lastUseTime = new AtomicLong( 0 );
 
@@ -27,7 +27,7 @@ public class ContentEntry {
     public ContentEntry( @Nonnull String name, @Nonnull ContentType type,
                          @Nullable String prompt, @Nullable Set<String> keywords,
                          @Nullable String message, @Nullable Path filepath, @Nullable String fileId,
-                         long timeout ) {
+                         long timeout, double probability ) {
         this.name = name;
         this.type = type;
         this.prompt = prompt;
@@ -36,6 +36,7 @@ public class ContentEntry {
         this.filepath = filepath;
         this.fileId = fileId;
         this.timeout = timeout;
+        this.probability = probability;
     }
 
     public String getName() {
@@ -74,6 +75,10 @@ public class ContentEntry {
 
     public long getTimeout() {
         return timeout;
+    }
+
+    public double getProbability() {
+        return probability;
     }
 
     public AtomicLong getLastUseTime() {

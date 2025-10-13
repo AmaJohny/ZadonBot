@@ -8,7 +8,6 @@ import ru.ama.zadon.zadonbot.yaml.YamlParser;
 import ru.ama.zadon.zadonbot.yaml.content.ContentConfigYaml;
 import ru.ama.zadon.zadonbot.yaml.content.ContentEntryYaml;
 
-import jakarta.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import jakarta.annotation.Nullable;
 
 public class UpdateContentTask implements Runnable {
 
@@ -78,17 +78,19 @@ public class UpdateContentTask implements Runnable {
 
     @Nullable
     private ContentEntry getContentEntry( ContentEntryYaml contentEntryYaml ) throws IOException {
+        String entryName = contentEntryYaml.getName();
         if ( contentEntryYaml.getPrompt() == null && contentEntryYaml.getKeywords() == null ) {
             LOGGER.error( "Content entry with name {} has no prompt or keywords and will never get triggered",
-                          contentEntryYaml.getName() );
+                          entryName );
             return null;
         }
         String filename = contentEntryYaml.getFilename();
         Path filepath = filename == null ? null : Paths.get( configPath, filename );
-        return new ContentEntry( contentEntryYaml.getName(), ContentType.valueOf( contentEntryYaml.getType() ),
+        return new ContentEntry( entryName, ContentType.valueOf( contentEntryYaml.getType() ),
                                  contentEntryYaml.getPrompt(), contentEntryYaml.getKeywords(),
                                  contentEntryYaml.getMessage(), filepath,
                                  Utils.getFileContent( Utils.getFileIdFilepath( filepath ) ),
-                                 Utils.toMilliseconds( contentEntryYaml.getTimeout() ) );
+                                 Utils.toMilliseconds( contentEntryYaml.getTimeout() ),
+                                 Utils.toProbability( contentEntryYaml.getProbability(), entryName ) );
     }
 }
