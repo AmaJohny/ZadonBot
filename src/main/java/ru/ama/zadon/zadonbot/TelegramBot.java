@@ -18,6 +18,7 @@ import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsume
 import org.telegram.telegrambots.longpolling.starter.AfterBotRegistration;
 import org.telegram.telegrambots.longpolling.starter.SpringLongPollingBot;
 import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
+import org.telegram.telegrambots.meta.api.methods.ActionType;
 import org.telegram.telegrambots.meta.api.methods.send.*;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessages;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
@@ -269,7 +270,17 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         return sendText( message.getChatId(), message.getMessageId(), textToSend );
     }
 
+    private void imitateAction( String chatId, ActionType actionType ) {
+        try {
+            telegramClient.execute( new SendChatAction( chatId, actionType.toString() ) );
+            Thread.sleep( 2_000L );
+        } catch ( Exception e ) {
+            LOGGER.error( "Error while imitating action", e );
+        }
+    }
+
     private Message sendText( Long chatId, Integer messageIdToReply, String textToSend ) {
+        imitateAction( chatId.toString(), ActionType.TYPING );
         SendMessage sendMessage = SendMessage.builder()
                                              .chatId( String.valueOf( chatId ) )
                                              .text( textToSend )
@@ -288,6 +299,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
+        imitateAction( message.getChatId().toString(), ActionType.UPLOAD_PHOTO );
 
         SendPhoto sendPhoto = SendPhoto.builder()
                                        .chatId( String.valueOf( message.getChatId() ) )
@@ -331,6 +343,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
+        imitateAction( message.getChatId().toString(), ActionType.UPLOAD_PHOTO );
 
         SendAnimation sendGif = SendAnimation.builder()
                                              .chatId( String.valueOf( message.getChatId() ) )
@@ -356,6 +369,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
+        imitateAction( message.getChatId().toString(), ActionType.UPLOAD_VOICE );
 
         SendAudio sendAudio = SendAudio.builder()
                                        .chatId( String.valueOf( message.getChatId() ) )
@@ -381,6 +395,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
+        imitateAction( message.getChatId().toString(), ActionType.RECORD_VOICE );
 
         SendVoice sendAudio = SendVoice.builder()
                                        .chatId( String.valueOf( message.getChatId() ) )
@@ -406,6 +421,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
+        imitateAction( message.getChatId().toString(), ActionType.UPLOAD_VIDEO );
 
         SendVideo sendAudio = SendVideo.builder()
                                        .chatId( String.valueOf( message.getChatId() ) )
@@ -431,6 +447,7 @@ public class TelegramBot implements SpringLongPollingBot, LongPollingSingleThrea
         String fileId = contentEntry.getFileId();
         Path filepath = contentEntry.getFilepath();
         InputFile inputFile = getInputFile( fileId, filepath );
+        imitateAction( message.getChatId().toString(), ActionType.RECORD_VIDEO_NOTE );
 
         SendVideoNote sendAudio = SendVideoNote.builder()
                                                .chatId( String.valueOf( message.getChatId() ) )
