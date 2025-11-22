@@ -73,7 +73,9 @@ public class UpdateContentTask implements Runnable {
                     promptedContentEntries.put( contentEntry.getPrompt(), contentEntry );
             }
         }
-        return new ContentConfig( promptedContentEntries, keywordsContentEntries );
+        ContentConfig contentConfig = new ContentConfig( promptedContentEntries, keywordsContentEntries );
+        LOGGER.debug( "Applying content config: {}", contentConfig );
+        return contentConfig;
     }
 
     @Nullable

@@ -108,4 +108,21 @@ public class ContentEntry {
                 throw new RuntimeException( e );
             }
     }
+
+    @Override
+    public String toString() {
+        return "ContentEntry{" +
+               "name='" + name + '\'' +
+               ", type=" + type +
+               ", description='" + description + '\'' +
+               ", prompt='" + prompt + '\'' +
+               ", keywords=" + keywords +
+               ", message='" + message + '\'' +
+               ", filepath=" + filepath +
+               ", timeout=" + timeout +
+               ", probability=" + probability +
+               ", lastUseTime=" + lastUseTime +
+               ", fileId='" + fileId + '\'' +
+               '}';
+    }
 }
