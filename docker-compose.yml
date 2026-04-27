@@ -11,7 +11,7 @@ services:
       PIC_FILES_PATH: /mnt/config/repo/shitpic
       PIC_LIST_FILENAME: /mnt/config/repo/shitpic/picsWithPrompts.yml
     env_file:
-      - environment.env
+      - stack.env
     volumes:
       - config:/mnt/config
 volumes:
